@@ -1,0 +1,46 @@
+{
+  "null_value": null,
+  "boolean_true": true,
+  "boolean_false": false,
+
+  "integers": [0, 1, -1, 42, -999999],
+  "floats": [0.0, -0.1, 3.14159, -2.5e3, 6.022e23],
+
+  "strings": {
+    "empty": "",
+    "simple": "hello world",
+    "escaped": "quote: \" backslash: \\ slash: \/ newline:\n tab:\t",
+    "unicode": "unicode: \u0041 \u03A9 \u2764"
+  },
+
+  "arrays": [
+    [],
+    [1, 2, 3],
+    ["a", "b", "c"],
+    [true, false, null],
+    [
+      {"id": 1},
+      {"id": 2},
+      {"id": 3}
+    ]
+  ],
+
+  "object": {
+    "name": "test object",
+    "version": 1,
+    "nested": {
+      "a": 10,
+      "b": [1, 2, 3],
+      "c": {
+        "x": true,
+        "y": null
+      }
+    }
+  },
+
+  "edge_numbers": {
+    "big": 1234567890123456789,
+    "small_exp": 1e-9,
+    "large_exp": 1e+9
+  }
+}
