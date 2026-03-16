@@ -37,10 +37,10 @@ typedef enum jsonh_type{
     JSONH_TRUE,
     JSONH_FALSE,
     JSONH_NULL,
-}jsonh_type_n;
+}json_type_n;
 
 typedef struct jsonh{
-    jsonh_type_n type;           // value type
+    json_type_n type;           // value type
 
     // sequetial walk on object/array items, values are ordered by order in file
     struct jsonh* next;
@@ -56,39 +56,16 @@ typedef struct jsonh{
     jchar_t* name;              // value name if it's the child of a object
 }jsonh_t;
 
-// parse -------------------------------
-// parse jsonh string
 jsonh_t* jsonh_parse(jchar_t* src, size_t len);
-// open file and parse it as json
-jsonh_t* jsonh_read(FILE* stream);
+jsonh_t* jsonh_parse_file(FILE* file);
+void jsonh_delete(jsonh_t* root);
 
-// Object methods ----------------------
-bool     jsonh_obj_has(jsonh_t* obj, char* key);
-jsonh_t* jsonh_obj_get(jsonh_t* obj, char* key);
+jsonh_t* jsonh_get(jsonh_t* root, char* key);
 
-// Array methods -----------------------
-size_t   jsonh_arr_size(jsonh_t* arr);
-jsonh_t* jsonh_arr_get(jsonh_t* arr, size_t index);
+int      jsonh_print(jsonh_t* root);
 
-// Number methods
-double   jsonh_num_get(jsonh_t* num);
-// String methods
-jchar_t* jsonh_str_get(jsonh_t* str);
-jchar_t* jsonh_str_dup(jsonh_t* str);
-// bool get
-bool     jsonh_bol_get(jsonh_t* bol);
-
-// output ------------------------------
-// print json structure to stdout
-int jsonh_print(jsonh_t* root);
-// print json structure to file stream
-int jsonh_write(FILE* stream, jsonh_t* root);
-// TODO: render json structure to a string
-jchar_t* jsonh_sprint(jsonh_t* root);
-
-// clean-up ----------------------------
-// recursive delete of json value
-void     jsonh_delete(jsonh_t* root);
+int      jsonh_print_object(jsonh_t* obj);
+int      jsonh_print_array(jsonh_t* arr);
 
 // -----------------------------------------------------------------------------
 // INTERNALS -------------------------------------------------------------------
@@ -161,15 +138,6 @@ static jsonh_t* _jhY_parse_number(struct jsonh_parser* p);
 
 static jsonh_t* _jhY_parse_value(struct jsonh_parser* p);
 
-static void _jhY_llappend(jsonh_t** head, jsonh_t** tail, jsonh_t* node);
-
-// printing
-
-static int _jh_indent(FILE* stream, int depth);
-static int _jh_print_object(FILE* stream, jsonh_t* node, int depth);
-static int _jh_print_array(FILE* stream, jsonh_t* node, int depth);
-static int _jh_print_value(FILE* stream, jsonh_t* node, int depth);
-
 #endif /* _JSON_H */
 
 // -----------------------------------------------------------------------------
@@ -216,6 +184,7 @@ static int _jhY_isdigit(struct jsonh_parser* p){
 }
 
 noreturn static void _jhY_panic(char* fmt,...){
+    
     va_list va;
     va_start(va,fmt);
     vfprintf(stderr,fmt,va);
@@ -229,14 +198,25 @@ static void _jhY_skip(struct jsonh_parser* p, jchar_t c){
     _jhY_next(p);
 }
 
-// JSON PARSING ----------------------------------------------------------------
+
+// VALUE PARSING ---------------------------------------------------------------
+
+static void _jhY_llappend(jsonh_t** head, jsonh_t** tail, jsonh_t* node){
+    node->next =  NULL;
+    node->prev = *tail;
+
+    if(*tail) (*tail)->next = node;
+    else *head = node;
+
+    *tail = node;
+}
 
 static jchar_t* _jhY_parse_cstr(struct jsonh_parser* p){
     _jhY_skip(p,_JCHR_QUOT);
 
     if(_jhY_check(p,_JCHR_QUOT)){
         // empty string
-        jchar_t* s = (char*)malloc(1);
+        jchar_t* s = malloc(1);
         if(!s) return NULL;
         s[0] = '\0';
         return s;
@@ -250,7 +230,7 @@ static jchar_t* _jhY_parse_cstr(struct jsonh_parser* p){
         if(_jhY_check(p,_JCHR_QUOT)){
             size_t len = p->pos - start;
             
-            jchar_t* out = (jchar_t*)calloc(len+1,sizeof(jchar_t));
+            jchar_t* out = calloc(len+1,sizeof(jchar_t));
             if(!out) return NULL;
             memcpy(out,&p->src[start],len*sizeof(jchar_t));
             out[len] = '\0';
@@ -265,7 +245,7 @@ static jchar_t* _jhY_parse_cstr(struct jsonh_parser* p){
 
     size_t cap = plen + 32;
     size_t len = plen;
-    jchar_t* buf = (jchar_t*)calloc(cap,sizeof(jchar_t));
+    jchar_t* buf = calloc(cap,sizeof(jchar_t));
     if(!buf) return NULL;
 
     memcpy(buf,&p->src[start],plen);
@@ -302,7 +282,7 @@ static jchar_t* _jhY_parse_cstr(struct jsonh_parser* p){
         }
         if(len + 1 >= cap){
             cap *= 2;
-            buf = (jchar_t*)realloc(buf,cap);
+            buf = realloc(buf,cap);
         }
         buf[len++] = c;
 
@@ -327,11 +307,11 @@ static jsonh_t* _jhY_parse_object(struct jsonh_parser* p){
         _jhY_next(p);
         return obj;
     }
-    _jhY_skipws(p);
     
     jsonh_t* head = NULL;
     jsonh_t* tail = NULL;
 
+    _jhY_skipws(p);
     while(1){
         char* name = _jhY_parse_cstr(p);
 
@@ -343,6 +323,7 @@ static jsonh_t* _jhY_parse_object(struct jsonh_parser* p){
 
         jsonh_t* member = _jhY_parse_value(p);
         member->name = name;
+        
         _jhY_llappend(&head,&tail,member);
 
         _jhY_skipws(p);
@@ -468,14 +449,18 @@ static jsonh_t* _jhY_parse_number(struct jsonh_parser* p){
         sign = -1;
         _jhY_next(p);
     }
-
+    
     // integer part
     if(_jhY_check(p,_JCHR_DIG0)) _jhY_next(p);
     else{
         if(!_jhY_isdigit(p)) _jhY_panic("JSONH: Expected digit at %d:%d",p->line,p->column);
-        for(; _jhY_isdigit(p); _jhY_next(p)) digits = (digits*10) + (p->cur - _JCHR_DIG0);
+        while(_jhY_isdigit(p)){
+            digits = (digits*10) + (p->cur - _JCHR_DIG0);
+            _jhY_next(p);
+        }
     }
 
+    
     // decimal part
     if(_jhY_check(p,_JCHR_DCPT)){
         _jhY_next(p);
@@ -486,7 +471,7 @@ static jsonh_t* _jhY_parse_number(struct jsonh_parser* p){
             _jhY_next(p);
         }
     }
-
+    
     // exponent
     if(_jhY_check(p,_JCHR_SEXP) || _jhY_check(p,_JCHR_CEXP)){
         _jhY_next(p);
@@ -497,10 +482,13 @@ static jsonh_t* _jhY_parse_number(struct jsonh_parser* p){
         }
 
         if(!_jhY_isdigit(p)) _jhY_panic("JSONH: Expected digit at %d:%d",p->line,p->column);
-        
-        for(; _jhY_isdigit(p); _jhY_next(p)) exp = (exp * 10) + (p->cur - _JCHR_DIG0);
-    }
 
+        while(_jhY_isdigit(p)){
+            exp = (exp * 10) + (p->cur - _JCHR_DIG0);
+            _jhY_next(p);
+        }
+    }
+    
     exp10 = (exp_sign * exp) - frac_digits;
     double val = (double)digits;
     if(exp10 != 0) val *= pow(10.0,exp10);
@@ -525,86 +513,14 @@ static jsonh_t* _jhY_parse_value(struct jsonh_parser* p){
 
 }
 
-static void _jhY_llappend(jsonh_t** head, jsonh_t** tail, jsonh_t* node){
-    node->next =  NULL;
-    node->prev = *tail;
-
-    if(*tail) (*tail)->next = node;
-    else *head = node;
-
-    *tail = node;
-}
-
-static int _jh_indent(FILE* stream, int depth)
-{
-    int r = 0;
-    for(int i = 0; i < depth; i++) r += fprintf(stream,"  ");
-    return r;
-}
-static int _jh_print_object(FILE* stream, jsonh_t* node, int depth){
-    if(node->value.child == NULL) return fprintf(stream,"{}");
-    int r = 0;
-    r += fprintf(stream,"{\n");
-    for(jsonh_t* cur = node->value.child; cur; cur = cur->next){
-        r += _jh_indent(stream,depth+1);
-        r += fprintf(stream,"\"%s\": ",cur->name);
-        r += _jh_print_value(stream,cur,depth+1);
-        
-        if(cur->next) r += fprintf(stream,",");
-        r += fprintf(stream,"\n");
-    }
-    r += _jh_indent(stream,depth);
-    r += fprintf(stream,"}");
-    return r;
-}
-static int _jh_print_array(FILE* stream, jsonh_t* node, int depth){
-    if(node->value.child == NULL) return fprintf(stream,"[]");
-    int r = 0;
-    r += fprintf(stream,"[\n");
-    for(jsonh_t* cur = node->value.child; cur; cur = cur->next){
-        r += _jh_indent(stream,depth+1);
-        r += _jh_print_value(stream,cur,depth+1);
-        
-        if(cur->next) r += fprintf(stream,",");
-        r += fprintf(stream,"\n");
-    }
-    r += _jh_indent(stream,depth);
-    r += fprintf(stream,"]");
-    return r;
-}
-static int _jh_print_value(FILE* stream, jsonh_t* node, int depth){
-    switch(node->type){
-        case JSONH_OBJECT:
-            return _jh_print_object(stream,node,depth);
-        case JSONH_ARRAY:
-            return _jh_print_array(stream,node,depth);
-        case JSONH_NUMBER:
-            return fprintf(stream,"\"%g\"",node->value.num);
-        case JSONH_STRING:
-            return fprintf(stream,"\"%s\"",node->value.str);
-        case JSONH_TRUE:
-            return fprintf(stream,"true");
-        case JSONH_FALSE:
-            return fprintf(stream,"false");
-        case JSONH_NULL:
-            return fprintf(stream,"null");
-    }
-}
-
-// -----------------------------------------------------------------------------
-// API IMPLEMENTATION ----------------------------------------------------------
-// -----------------------------------------------------------------------------
-
 jsonh_t* jsonh_parse(char* src, size_t len){
-    if(!src) return NULL;
     jsonh_t* json;
     struct jsonh_parser p = {.src = src,.size = len, .line = 1, .column = 1, .cur = src[0]};
     json = _jhY_parse_value(&p);
     return json;
 }
 
-jsonh_t* jsonh_read(FILE* file){
-    if(!file) return NULL;
+jsonh_t* jsonh_parse_file(FILE* file){
     
     fseek(file,0L,SEEK_END);
     size_t fsiz = ftell(file);
@@ -623,14 +539,15 @@ jsonh_t* jsonh_read(FILE* file){
 void jsonh_delete(jsonh_t* root){
     if(!root) return;
 
-    if(root->type == JSONH_OBJECT || root->type == JSONH_ARRAY){
-        jsonh_t* cur = root->value.child;
-        while(cur){
-            jsonh_t* next = cur->next;
-            jsonh_delete(cur);
-            cur = next;
+        if(root->type == JSONH_OBJECT || root->type == JSONH_ARRAY){
+            jsonh_t* cur = root->value.child;
+
+            while(cur){
+                jsonh_t* next = cur->next;
+                jsonh_delete(cur);
+                cur = next;
+            }
         }
-    }
     else if(root->type == JSONH_STRING){
         free(root->value.str);
     }
@@ -641,76 +558,108 @@ void jsonh_delete(jsonh_t* root){
     free(root);
 }
 
-jsonh_t* jsonh_obj_get(jsonh_t* obj, char* key){
-    if(!obj || !key) return NULL;
-    if(obj->type != JSONH_OBJECT) return NULL;
-    for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
+jsonh_t* jsonh_get(jsonh_t* root, char* key){
+    for(jsonh_t* cur = root->value.child; cur; cur = cur->next){
         if(!strcmp(cur->name,key)) return cur;
     }
     return NULL;
 }
-bool jsonh_obj_has(jsonh_t* obj, char* key){
-    if(!obj || !key) return false;
-    if(obj->type != JSONH_OBJECT) return false;
-    for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
-        if(!strcmp(cur->name,key)) return true;
+
+int      jsonh_print(jsonh_t* root){
+    int r = 0;
+    for(jsonh_t* cur = root->value.child; cur; cur = cur->next){
+        switch(cur->type){
+        case JSONH_OBJECT: 
+            r += jsonh_print_object(cur);
+            break;
+        case JSONH_ARRAY:
+            r += jsonh_print_array(cur);
+            break;
+        case JSONH_NUMBER:
+            r += printf("%s: %lf\n",cur->name,cur->value.num);
+            break;
+        case JSONH_STRING:
+            r += printf("%s: %s\n",cur->name,cur->value.str);
+            break;
+        case JSONH_TRUE:
+            r += printf("%s: true\n",cur->name);
+            break;
+        case JSONH_FALSE:
+            r += printf("%s: false\n",cur->name);
+            break;
+        case JSONH_NULL:
+            r += printf("%s: null\n",cur->name);
+            break;
+        }
     }
-    return false;
+    return r;
 }
-
-size_t   jsonh_arr_size(jsonh_t* arr){
-    if(!arr) return 0;
-    if(arr->type != JSONH_ARRAY) return 0;
-    size_t s = 0;
-    for (jsonh_t* cur = arr->value.child; cur; cur = cur->next) s++;
-    return s;
-}
-jsonh_t* jsonh_arr_get(jsonh_t* arr, size_t index){
-    if(!arr) return NULL;
-    if(arr->type != JSONH_ARRAY) return NULL;
-    jsonh_t* cur = arr->value.child;
-    for(size_t i = 0; i < index; i++){
-        if(cur->next) cur = cur->next;
-        else return NULL;
+int      jsonh_print_object(jsonh_t* obj){
+    if(!obj->value.child) return printf("{}\n");
+    int r = 0;
+    if(obj->name) r += printf("%s: {\n", obj->name);
+    else r += printf("{\n");
+    for(jsonh_t* cur = obj->value.child; cur; cur = cur->next){
+        switch(cur->type){
+        case JSONH_OBJECT: 
+            r += jsonh_print_object(cur);
+            break;
+        case JSONH_ARRAY:
+            r += jsonh_print_array(cur);
+            break;
+        case JSONH_NUMBER:
+            r += printf("%s: %lf\n",cur->name,cur->value.num);
+            break;
+        case JSONH_STRING:
+            r += printf("%s: %s\n",cur->name,cur->value.str);
+            break;
+        case JSONH_TRUE:
+            r += printf("%s: true\n",cur->name);
+            break;
+        case JSONH_FALSE:
+            r += printf("%s: false\n",cur->name);
+            break;
+        case JSONH_NULL:
+            r += printf("%s: null\n",cur->name);
+            break;
+        }
     }
-    return cur;
+    r += printf("}\n");
+    return r;
 }
-
-double   jsonh_num_get(jsonh_t* num){
-    if(!num) return 0;
-    if(num->type != JSONH_NUMBER) return 0;
-    return num->value.num;
-}
-jchar_t* jsonh_str_get(jsonh_t* str){
-    if(!str) return NULL;
-    if(str->type != JSONH_STRING) return NULL;
-    return str->value.str;
-}
-jchar_t* jsonh_str_dup(jsonh_t* str){
-    if(!str) return NULL;
-    if(str->type != JSONH_STRING) return NULL;
-    size_t len = strlen(str->value.str);
-    jchar_t* dup = (jchar_t*)calloc(len,sizeof(jchar_t));
-    if(!dup) return NULL;
-    strcpy(dup,str->value.str);
-    return dup;
-}
-
-
-bool     jsonh_bol_get(jsonh_t* bol){
-    if(!bol) return false;
-    if(bol->type != JSONH_TRUE && bol->type != JSONH_FALSE) return false;
-    return bol->value.bol;
-}
-
-int jsonh_print(jsonh_t* root){
-    if(!root) return 0;
-    return _jh_print_value(stdout,root,0);
-}
-
-int jsonh_write(FILE* stream, jsonh_t* root){
-    if(!root) return 0;
-    return _jh_print_value(stream,root,0);
+int      jsonh_print_array(jsonh_t* arr){
+    if(!arr->value.child) return printf("[]\n");
+    int r = 0;
+    if(arr->name) r += printf("%s: [", arr->name);
+    else r += printf("[");
+    for(jsonh_t* cur = arr->value.child; cur; cur = cur->next){
+        switch(cur->type){
+        case JSONH_OBJECT:
+            r += jsonh_print_object(cur);
+            break;
+        case JSONH_ARRAY: 
+            r += jsonh_print_array(cur);
+            break;
+        case JSONH_NUMBER:
+            r += printf("%lf",cur->value.num);
+            break;
+        case JSONH_STRING:
+            r += printf("%s",cur->value.str);
+            break;
+        case JSONH_TRUE:
+            r += printf("true");
+            break;
+        case JSONH_FALSE:
+            r += printf("false");
+            break;
+        case JSONH_NULL:
+            r += printf("null");
+            break;
+        }
+        if(cur->next) printf(", ");
+    }
+    r += printf("]\n");
+    return r;
 }
 
 #endif /* JSONH_IMPL */
