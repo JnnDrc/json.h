@@ -46,13 +46,13 @@ typedef struct jsonh{
     struct jsonh* prev;
 
     union{
-        jchar_t*  str;          // value as a string
+        jchar_t*  str;          // value as string
         double    num;          // value as number
         bool      bol;          // value as boolean (true/false)
         struct jsonh* child;    // pointer to first element of object/array
     }value;
 
-    jchar_t* name;              // value name if it's the child of a object
+    jchar_t* name;              // value name if it's the child of an object
 }jsonh_t;
 
 // parse -------------------------------
