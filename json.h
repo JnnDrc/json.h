@@ -1,7 +1,6 @@
 #ifndef _JSON_H
 #define _JSON_H
 
-// TODO: Better print/formatting
 // TODO: Better error handling
 // TODO: Edit/Write API
 // TODO: Iterate over array/object API
@@ -63,20 +62,74 @@ jsonh_t* jsonh_parse(jchar_t* src, size_t len);
 jsonh_t* jsonh_read(FILE* stream);
 
 // Object methods ----------------------
-bool     jsonh_obj_has(jsonh_t* obj, char* key);
-jsonh_t* jsonh_obj_get(jsonh_t* obj, char* key);
+// check if object have member #key
+bool     jsonh_obj_has(jsonh_t* obj,jchar_t* key);
+// return member #key of object or NULL if doesn't exist
+jsonh_t* jsonh_obj_get(jsonh_t* obj, jchar_t* key);
+// check if object have member #key, case insensitive
+bool     jsonh_obj_ihas(jsonh_t* obj, jchar_t* key);
+// return member #key of object or NULL if doesn't exist, case insensitive
+jsonh_t* jsonh_obj_iget(jsonh_t* obj, jchar_t* key);
+// add item to object
+int      jsonh_obj_add(jsonh_t* obj, jchar_t* key, jsonh_t* item);
+// remove item from object
+int      jsonh_obj_del(jsonh_t* obj, jchar_t* key);
+// remove item from object, case insensitive
+int      jsonh_obj_idel(jsonh_t* obj, jchar_t* key);
 
 // Array methods -----------------------
 size_t   jsonh_arr_size(jsonh_t* arr);
 jsonh_t* jsonh_arr_get(jsonh_t* arr, size_t index);
+int      jsonh_arr_push(jsonh_t* arr, jsonh_t* item);
+int      jsonh_arr_pop(jsonh_t* arr);
+int      jsonh_arr_put(jsonh_t* arr, jsonh_t* item);
+int      jsonh_arr_pull(jsonh_t* arr);
+int      jsonh_arr_insert(jsonh_t* arr, size_t index, jsonh_t* item);
+int      jsonh_arr_remove(jsonh_t* arr, size_t index);
 
-// Number methods
+// Number methods ----------------------
+// get number value
 double   jsonh_num_get(jsonh_t* num);
-// String methods
+// set number value
+int      jsonh_num_set(jsonh_t* num, double val);
+
+// String methods ----------------------
+// get string value
 jchar_t* jsonh_str_get(jsonh_t* str);
+// get duplicate of string value (need to free)
 jchar_t* jsonh_str_dup(jsonh_t* str);
-// bool get
+// set string value
+int      jsonh_str_set(jsonh_t* str, jchar_t* val);
+
+// Bool methods ------------------------
+// get bool value
 bool     jsonh_bol_get(jsonh_t* bol);
+// set bool value
+int      jsonh_bol_set(jsonh_t* bol, bool val);
+
+// is ----------------------------------
+// check type of json object
+bool jsonh_is(jsonh_t* json, jsonh_type_n type);
+bool jsonh_is_object(jsonh_t* json);
+bool jsonh_is_array(jsonh_t* json);
+bool jsonh_is_number(jsonh_t* json);
+bool jsonh_is_string(jsonh_t* json);
+bool jsonh_is_true(jsonh_t* json);
+bool jsonh_is_false(jsonh_t* json);
+bool jsonh_is_bool(jsonh_t* json);
+bool jsonh_is_null(jsonh_t* json);
+
+// new ----------------------------
+// create object of type
+jsonh_t* jsonh_new(jsonh_type_n type);
+jsonh_t* jsonh_new_object(void);
+jsonh_t* jsonh_new_array(void);
+jsonh_t* jsonh_new_number(double num);
+jsonh_t* jsonh_new_string(jchar_t* str);
+jsonh_t* jsonh_new_true(void);
+jsonh_t* jsonh_new_false(void);
+jsonh_t* jsonh_new_bool(bool bol);
+jsonh_t* jsonh_new_null(void);
 
 // output ------------------------------
 // print json structure to stdout
@@ -84,11 +137,71 @@ int jsonh_print(jsonh_t* root);
 // print json structure to file stream
 int jsonh_write(FILE* stream, jsonh_t* root);
 // TODO: render json structure to a string
-jchar_t* jsonh_sprint(jsonh_t* root);
+jchar_t* jsonh_render(jsonh_t* root);
 
 // clean-up ----------------------------
 // recursive delete of json value
 void     jsonh_delete(jsonh_t* root);
+
+#if defined JSONH_PREFIX || defined JH_PREFIX
+
+#define jh_parse        jsonh_parse
+#define jh_read         jsonh_read
+
+#define jh_obj_has      jsonh_obj_has
+#define jh_obj_get      jsonh_obj_get
+#define jh_obj_ihas     jsonh_obj_ihas
+#define jh_obj_iget     jsonh_obj_iget
+#define jh_obj_add      jsonh_obj_add
+#define jh_obj_del      jsonh_obj_del
+#define jh_obj_idel     jsonh_obj_idel
+
+#define jh_arr_size     jsonh_arr_size
+#define jh_arr_get      jsonh_arr_get
+#define jh_arr_push     jsonh_arr_push
+#define jh_arr_pop      jsonh_arr_pop
+#define jh_arr_put      jsonh_arr_put
+#define jh_arr_pull     jsonh_arr_pull
+#define jh_arr_insert   jsonh_arr_insert
+#define jh_arr_remove   jsonh_arr_remove
+
+#define jh_num_get   jsonh_num_get
+#define jh_num_set   jsonh_num_set
+
+#define jh_str_get   jsonh_str_get
+#define jh_str_dup   jsonh_str_dup
+#define jh_str_set   jsonh_str_set
+
+#define jh_bol_get   jsonh_bol_get
+#define jh_bol_set   jsonh_bol_set
+
+#define jh_is           jsonh_is
+#define jh_is_object    jsonh_is_object
+#define jh_is_array     jsonh_is_array
+#define jh_is_number    jsonh_is_number
+#define jh_is_string    jsonh_is_string
+#define jh_is_true      jsonh_is_true
+#define jh_is_false     jsonh_is_false
+#define jh_is_bool      jsonh_is_bool
+#define jh_is_null      jsonh_is_null
+
+#define jh_new          jsonh_new
+#define jh_new_object   jsonh_new_object
+#define jh_new_array    jsonh_new_array
+#define jh_new_number   jsonh_new_number
+#define jh_new_string   jsonh_new_string
+#define jh_new_true     jsonh_new_true
+#define jh_new_false    jsonh_new_false
+#define jh_new_bool     jsonh_new_bool
+#define jh_new_null     jsonh_new_null
+
+#define jh_print        jsonh_print
+#define jh_write        jsonh_write
+#define jh_sprint       jsonh_sprint
+
+#define jh_delete       jsonh_delete
+
+#endif /* JSONH_PREFIX */
 
 // -----------------------------------------------------------------------------
 // INTERNALS -------------------------------------------------------------------
@@ -124,17 +237,23 @@ void     jsonh_delete(jsonh_t* root);
 #define _JCHR_SOLI 0x002F // solidus, /
 
 // definiton of ecma-404 literal name values
-#define _JLIT_TRUE  "true"
-#define _JLIT_FALSE "false"
-#define _JLIT_NULL  "null"
+// #define _JLIT_TRUE  "true"
+// #define _JLIT_FALSE "false"
+// #define _JLIT_NULL  "null"
+static const jchar_t _JLIT_TRUE[]  = {0x0074,0x0072,0x0075,0x0065};
+static const jchar_t _JLIT_FALSE[] = {0x0066,0x0061,0x006C,0x0073,0x0065};
+static const jchar_t _JLIT_NULL[]  = {0x006E,0x0075,0x006C,0x006C};
 
-#define _JLEN_TRUE   sizeof(_JLIT_TRUE)  - 1
-#define _JLEN_FALSE  sizeof(_JLIT_FALSE) - 1
-#define _JLEN_NULL   sizeof(_JLIT_NULL)  - 1
+// #define _JLEN_TRUE   sizeof(_JLIT_TRUE)  - 1
+// #define _JLEN_FALSE  sizeof(_JLIT_FALSE) - 1
+// #define _JLEN_NULL   sizeof(_JLIT_NULL)  - 1
+#define _JLEN_TRUE   sizeof(_JLIT_TRUE)
+#define _JLEN_FALSE  sizeof(_JLIT_FALSE)
+#define _JLEN_NULL   sizeof(_JLIT_NULL)
 
 // parser state
 
-struct jsonh_parser{
+struct _jhY{
     jchar_t*    src;
     size_t      size;
     size_t      pos;
@@ -142,24 +261,24 @@ struct jsonh_parser{
     jchar_t     cur;
 };
 
-static jchar_t _jhY_next(struct jsonh_parser* p);
-static jchar_t _jhY_peek(struct jsonh_parser* p);
-static int _jhY_check(struct jsonh_parser* p, jchar_t c);
-static void _jhY_skipws(struct jsonh_parser* p);
-static int _jhY_isdigit(struct jsonh_parser* p);
+static jchar_t _jhY_next(struct _jhY* p);
+static jchar_t _jhY_peek(struct _jhY* p);
+static int _jhY_check(struct _jhY* p, jchar_t c);
+static void _jhY_skipws(struct _jhY* p);
+static int _jhY_isdigit(struct _jhY* p);
 
 noreturn static void _jhY_panic(char* fmt,...);
 
 // value parsers
-static jsonh_t* _jhY_parse_object(struct jsonh_parser* p);
-static jsonh_t* _jhY_parse_array(struct jsonh_parser* p);
-static jsonh_t* _jhY_parse_string(struct jsonh_parser* p);
-static jsonh_t* _jhY_parse_true(struct jsonh_parser* p);
-static jsonh_t* _jhY_parse_false(struct jsonh_parser* p);
-static jsonh_t* _jhY_parse_null(struct jsonh_parser* p);
-static jsonh_t* _jhY_parse_number(struct jsonh_parser* p);
+static jsonh_t* _jhY_parse_object(struct _jhY* p);
+static jsonh_t* _jhY_parse_array(struct _jhY* p);
+static jsonh_t* _jhY_parse_string(struct _jhY* p);
+static jsonh_t* _jhY_parse_true(struct _jhY* p);
+static jsonh_t* _jhY_parse_false(struct _jhY* p);
+static jsonh_t* _jhY_parse_null(struct _jhY* p);
+static jsonh_t* _jhY_parse_number(struct _jhY* p);
 
-static jsonh_t* _jhY_parse_value(struct jsonh_parser* p);
+static jsonh_t* _jhY_parse_value(struct _jhY* p);
 
 static void _jhY_llappend(jsonh_t** head, jsonh_t** tail, jsonh_t* node);
 
@@ -187,7 +306,7 @@ static int _jh_print_value(FILE* stream, jsonh_t* node, int depth);
 
 // PARSER ----------------------------------------------------------------------
 
-static jchar_t _jhY_next(struct jsonh_parser* p){
+static jchar_t _jhY_next(struct _jhY* p){
     if(p->cur == '\n'){
         p->line++;
         p->column = 1;
@@ -196,22 +315,22 @@ static jchar_t _jhY_next(struct jsonh_parser* p){
     return p->cur = p->src[p->pos];
 }
 
-static jchar_t _jhY_peek(struct jsonh_parser* p){
+static jchar_t _jhY_peek(struct _jhY* p){
     return p->src[p->pos+1];
 }
 
-static int _jhY_check(struct jsonh_parser* p, jchar_t c){
+static int _jhY_check(struct _jhY* p, jchar_t c){
     return (p->cur == c);
 }
 
-static void _jhY_skipws(struct jsonh_parser* p){
+static void _jhY_skipws(struct _jhY* p){
     while(  p->cur == _JWSP_TB ||
             p->cur == _JWSP_LF ||
             p->cur == _JWSP_CR ||
             p->cur == _JWSP_SP) _jhY_next(p);
 }
 
-static int _jhY_isdigit(struct jsonh_parser* p){
+static int _jhY_isdigit(struct _jhY* p){
     return (p->cur >= _JCHR_DIG0 && p->cur <= _JCHR_DIG9);
 }
 
@@ -224,19 +343,19 @@ noreturn static void _jhY_panic(char* fmt,...){
     exit(1);
 }
 
-static void _jhY_skip(struct jsonh_parser* p, jchar_t c){
+static void _jhY_skip(struct _jhY* p, jchar_t c){
     if(p->cur != c) _jhY_panic("JSONH: Expected '%c' at %zu:%zu but got '%c'",c,p->line,p->column,p->cur);
     _jhY_next(p);
 }
 
 // JSON PARSING ----------------------------------------------------------------
 
-static jchar_t* _jhY_parse_cstr(struct jsonh_parser* p){
+static jchar_t* _jhY_parse_cstr(struct _jhY* p){
     _jhY_skip(p,_JCHR_QUOT);
 
     if(_jhY_check(p,_JCHR_QUOT)){
         // empty string
-        jchar_t* s = (char*)malloc(1);
+        jchar_t* s = (jchar_t*)calloc(1,sizeof(jchar_t));
         if(!s) return NULL;
         s[0] = '\0';
         return s;
@@ -313,7 +432,7 @@ static jchar_t* _jhY_parse_cstr(struct jsonh_parser* p){
     return buf;
 }
 
-static jsonh_t* _jhY_parse_object(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_object(struct _jhY* p){
     jsonh_t* obj = (jsonh_t*)malloc(sizeof(jsonh_t));
     if(!obj) return NULL;
     obj->type = JSONH_OBJECT;
@@ -333,7 +452,7 @@ static jsonh_t* _jhY_parse_object(struct jsonh_parser* p){
     jsonh_t* tail = NULL;
 
     while(1){
-        char* name = _jhY_parse_cstr(p);
+        jchar_t* name = _jhY_parse_cstr(p);
 
         _jhY_next(p);
         _jhY_skipws(p);
@@ -359,7 +478,7 @@ static jsonh_t* _jhY_parse_object(struct jsonh_parser* p){
 
     return obj;
 }
-static jsonh_t* _jhY_parse_array(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_array(struct _jhY* p){
     jsonh_t* arr = (jsonh_t*)malloc(sizeof(jsonh_t));
     if(!arr) return NULL;
     arr->type = JSONH_ARRAY;
@@ -395,7 +514,7 @@ static jsonh_t* _jhY_parse_array(struct jsonh_parser* p){
     arr->value.child = head;
     return arr;
 }
-static jsonh_t* _jhY_parse_string(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_string(struct _jhY* p){
     jsonh_t* str = (jsonh_t*)malloc(sizeof(jsonh_t));
     if(!str) return NULL;
     str->type = JSONH_STRING;
@@ -407,7 +526,7 @@ static jsonh_t* _jhY_parse_string(struct jsonh_parser* p){
 
     return str;
 }
-static jsonh_t* _jhY_parse_true(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_true(struct _jhY* p){
     if(strncmp(&p->src[p->pos],_JLIT_TRUE,_JLEN_TRUE)) return NULL;
     p->pos += _JLEN_TRUE;
     p->cur = p->src[p->pos];
@@ -421,7 +540,7 @@ static jsonh_t* _jhY_parse_true(struct jsonh_parser* p){
 
     return t;
 }
-static jsonh_t* _jhY_parse_false(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_false(struct _jhY* p){
     if(strncmp(&p->src[p->pos],_JLIT_FALSE,_JLEN_FALSE)) return NULL;
     p->pos += _JLEN_FALSE;
     p->cur = p->src[p->pos];
@@ -436,7 +555,7 @@ static jsonh_t* _jhY_parse_false(struct jsonh_parser* p){
 
     return f;
 }
-static jsonh_t* _jhY_parse_null(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_null(struct _jhY* p){
     if(strncmp(&p->src[p->pos],_JLIT_NULL,_JLEN_NULL)) return NULL;
     p->pos += _JLEN_NULL;
     p->cur = p->src[p->pos];
@@ -450,7 +569,7 @@ static jsonh_t* _jhY_parse_null(struct jsonh_parser* p){
 
     return f;
 }
-static jsonh_t* _jhY_parse_number(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_number(struct _jhY* p){
     jsonh_t* num = (jsonh_t*)malloc(sizeof(jsonh_t));
     if(!num) return NULL;
     num->type = JSONH_NUMBER;
@@ -510,7 +629,7 @@ static jsonh_t* _jhY_parse_number(struct jsonh_parser* p){
 }
 
 
-static jsonh_t* _jhY_parse_value(struct jsonh_parser* p){
+static jsonh_t* _jhY_parse_value(struct _jhY* p){
     _jhY_skipws(p);
 
     switch(p->cur){
@@ -595,10 +714,10 @@ static int _jh_print_value(FILE* stream, jsonh_t* node, int depth){
 // API IMPLEMENTATION ----------------------------------------------------------
 // -----------------------------------------------------------------------------
 
-jsonh_t* jsonh_parse(char* src, size_t len){
+jsonh_t* jsonh_parse(jchar_t* src, size_t len){
     if(!src) return NULL;
     jsonh_t* json;
-    struct jsonh_parser p = {.src = src,.size = len, .line = 1, .column = 1, .cur = src[0]};
+    struct _jhY p = {.src = src,.size = len, .line = 1, .column = 1, .cur = src[0]};
     json = _jhY_parse_value(&p);
     return json;
 }
@@ -607,8 +726,10 @@ jsonh_t* jsonh_read(FILE* file){
     if(!file) return NULL;
     
     fseek(file,0L,SEEK_END);
-    size_t fsiz = ftell(file);
+    long sz = ftell(file);
+    if(sz < 0) return NULL;
     rewind(file);
+    size_t fsiz = (size_t)sz;
 
     jchar_t* buf = (jchar_t*)calloc(fsiz,sizeof(jchar_t));
     if(!buf) return NULL;
@@ -641,7 +762,21 @@ void jsonh_delete(jsonh_t* root){
     free(root);
 }
 
-jsonh_t* jsonh_obj_get(jsonh_t* obj, char* key){
+int strcmpi(const char* s1, const char* s2){
+    while(*s1 && (tolower((unsigned char)*s1) == tolower((unsigned char)*s2))) (s1++,s2++);
+    return tolower((unsigned char)*s1) - tolower((unsigned char)*s2);
+}
+
+bool jsonh_obj_has(jsonh_t* obj, jchar_t* key){
+    if(!obj || !key) return false;
+    if(obj->type != JSONH_OBJECT) return false;
+    for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
+        if(!strcmp(cur->name,key)) return true;
+    }
+    return false;
+}
+
+jsonh_t* jsonh_obj_get(jsonh_t* obj, jchar_t* key){
     if(!obj || !key) return NULL;
     if(obj->type != JSONH_OBJECT) return NULL;
     for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
@@ -649,13 +784,82 @@ jsonh_t* jsonh_obj_get(jsonh_t* obj, char* key){
     }
     return NULL;
 }
-bool jsonh_obj_has(jsonh_t* obj, char* key){
+
+bool     jsonh_obj_ihas(jsonh_t* obj, jchar_t* key){
     if(!obj || !key) return false;
     if(obj->type != JSONH_OBJECT) return false;
     for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
-        if(!strcmp(cur->name,key)) return true;
+        if(!strcmpi(cur->name,key)) return true;
     }
     return false;
+}
+jsonh_t* jsonh_obj_iget(jsonh_t* obj, jchar_t* key){
+    if(!obj || !key) return NULL;
+    if(obj->type != JSONH_OBJECT) return NULL;
+    for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
+        if(!strcmpi(cur->name,key)) return cur;
+    }
+    return NULL;
+}
+
+int jsonh_obj_add(jsonh_t* obj,jchar_t* key, jsonh_t* item){
+    if(!obj || !item) return -1;
+    if(obj->type != JSONH_OBJECT) return -1;
+    
+    jsonh_t* cur = obj->value.child;
+    if(!cur){
+        obj->value.child = item;
+        item->name = strdup(key);
+        return 0;
+    }
+    while(cur->next) cur = cur->next;
+
+    cur->next  = item;
+    item->prev = cur;
+    item->name = strdup(key);
+
+    return 0;
+
+}
+
+int jsonh_obj_del(jsonh_t* obj, jchar_t* key){
+    if(!obj || !key) return -1;
+    if(obj->type != JSONH_OBJECT) return -1;
+    
+    for(jsonh_t* cur = obj->value.child; cur; cur = cur->next){
+        if(!strcmp(cur->name,key)){
+            jsonh_t* prev = cur->prev;
+            jsonh_t* next = cur->next;
+
+            prev->next = next;
+            next->prev = prev;
+
+            jsonh_delete(cur);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int jsonh_obj_idel(jsonh_t* obj, jchar_t* key){
+    if(!obj || !key) return -1;
+    if(obj->type != JSONH_OBJECT) return -1;
+    
+    for(jsonh_t* cur = obj->value.child; cur; cur = cur->next){
+        if(!strcmpi(cur->name,key)){
+            jsonh_t* prev = cur->prev;
+            jsonh_t* next = cur->next;
+
+            prev->next = next;
+            next->prev = prev;
+
+            jsonh_delete(cur);
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 size_t   jsonh_arr_size(jsonh_t* arr){
@@ -666,7 +870,7 @@ size_t   jsonh_arr_size(jsonh_t* arr){
     return s;
 }
 jsonh_t* jsonh_arr_get(jsonh_t* arr, size_t index){
-    if(!arr) return NULL;
+    if(!arr || index < 0) return NULL;
     if(arr->type != JSONH_ARRAY) return NULL;
     jsonh_t* cur = arr->value.child;
     for(size_t i = 0; i < index; i++){
@@ -676,11 +880,96 @@ jsonh_t* jsonh_arr_get(jsonh_t* arr, size_t index){
     return cur;
 }
 
+int     jsonh_arr_push(jsonh_t* arr, jsonh_t* item){
+    if(!arr | !item) return -1;
+    if(arr->type != JSONH_ARRAY) return -1;
+    jsonh_t* cur = arr->value.child;
+    if(!cur) {
+        arr->value.child = item;
+        return 0;
+    }
+    while(cur->next) cur = cur->next;
+    cur->next = item;
+    item->prev = cur;
+    return 0;
+}
+int     jsonh_arr_pop(jsonh_t* arr){
+    if(!arr) return -1;
+    if(arr->type != JSONH_ARRAY) return -1;
+    jsonh_t* cur = arr->value.child;
+    while(cur->next) cur = cur->next;
+    cur->prev->next = NULL;
+    jsonh_delete(cur);
+}
+int     jsonh_arr_put(jsonh_t* arr, jsonh_t* item){
+    if(!arr | !item) return -1;
+    if(arr->type != JSONH_ARRAY) return -1;
+
+    item->next = arr->value.child;
+    arr->value.child = item;
+    return 0;
+}
+int     jsonh_arr_pull(jsonh_t* arr){
+    if(!arr) return -1;
+    if(arr->type != JSONH_ARRAY) return -1;
+
+    jsonh_t* cur = arr->value.child;
+    arr->value.child = cur->next;
+    jsonh_delete(cur);
+}
+int     jsonh_arr_insert(jsonh_t* arr, size_t index, jsonh_t* item){
+    if(!arr | !item || index < 0 ) return -1;
+    if(arr->type != JSONH_ARRAY) return -1;
+
+    jsonh_t* cur = arr->value.child;
+    if(!cur) {
+        arr->value.child = item;
+        return 0;
+    }
+    for(size_t i = 0; i < index; i++){
+        if(cur->next) cur = cur->next;
+        else return -1;
+    }
+    
+    jsonh_t* prev = cur->prev;
+    if(prev) prev->next = item;
+    cur->prev  = item;
+    item->prev = prev;
+    item->next = cur;
+    return 0;
+}
+int     jsonh_arr_remove(jsonh_t* arr, size_t index){
+    if(!arr || index < 0 ) return -1;
+    if(arr->type != JSONH_ARRAY) return -1;
+
+    jsonh_t* cur = arr->value.child;
+    for(size_t i = 0; i < index; i++){
+        if(cur->next) cur = cur->next;
+        else return -1;
+    }
+
+    jsonh_t* prev = cur->prev;
+    jsonh_t* next = cur->next;
+    
+    if(prev) prev->next = next;
+    if(next) next->prev = prev;
+
+    jsonh_delete(cur);
+    return 0;
+}
+
 double   jsonh_num_get(jsonh_t* num){
     if(!num) return 0;
     if(num->type != JSONH_NUMBER) return 0;
     return num->value.num;
 }
+int     jsonh_num_set(jsonh_t* num, double val){
+    if(!num) return -1;
+    if(num->type != JSONH_NUMBER) return -1;
+    num->value.num = val;
+    return 0;
+}
+
 jchar_t* jsonh_str_get(jsonh_t* str){
     if(!str) return NULL;
     if(str->type != JSONH_STRING) return NULL;
@@ -696,11 +985,132 @@ jchar_t* jsonh_str_dup(jsonh_t* str){
     return dup;
 }
 
+int jsonh_str_set(jsonh_t* str, jchar_t* val){
+    if(!str || !val) return -1;
+    if(str->type != JSONH_STRING) return -1;
+
+    free(str->value.str);
+    str->value.str = strdup(val);
+
+    return 0;
+}
 
 bool     jsonh_bol_get(jsonh_t* bol){
     if(!bol) return false;
     if(bol->type != JSONH_TRUE && bol->type != JSONH_FALSE) return false;
     return bol->value.bol;
+}
+int     jsonh_bol_set(jsonh_t* bol, bool val){
+    if(!bol) return -1;
+    if(bol->type != JSONH_TRUE && bol->type != JSONH_FALSE) return -1;
+    bol->value.bol = val;
+    return 0;
+}
+
+bool jsonh_is(jsonh_t* json, jsonh_type_n type){
+    return json->type == type;
+}
+
+bool jsonh_is_object(jsonh_t* json){
+    return json->type == JSONH_OBJECT;
+}
+bool jsonh_is_array(jsonh_t* json){
+    return json->type == JSONH_ARRAY;
+}
+bool jsonh_is_number(jsonh_t* json){
+    return json->type == JSONH_NUMBER;
+}
+bool jsonh_is_string(jsonh_t* json){
+    return json->type == JSONH_STRING;
+}
+bool jsonh_is_true(jsonh_t* json){
+    return json->type == JSONH_TRUE;
+}
+bool jsonh_is_false(jsonh_t* json){
+    return json->type == JSONH_FALSE;
+}
+bool jsonh_is_bool(jsonh_t* json){
+    return json->type == JSONH_TRUE || json->type == JSONH_FALSE;
+}
+bool jsonh_is_null(jsonh_t* json){
+    return json->type == JSONH_NULL;
+}
+
+jsonh_t* jsonh_new(jsonh_type_n type){
+    jsonh_t* n = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!n) return NULL;
+    n->type = type;
+    n->next = n->prev;
+    return n;
+}
+
+jsonh_t* jsonh_new_object(void){
+    jsonh_t* o = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!o) return NULL;
+    o->type = JSONH_OBJECT;
+    o->next = o->prev = NULL;
+    o->value.child = NULL;
+    return o;
+}
+jsonh_t* jsonh_new_array(void){
+    jsonh_t* a = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!a) return NULL;
+    a->type = JSONH_ARRAY;
+    a->next = a->prev = NULL;
+    a->value.child = NULL;
+    return a;
+}
+jsonh_t* jsonh_new_number(double num){
+    jsonh_t* n = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!n) return NULL;
+    n->type = JSONH_NUMBER;
+    n->next = n->prev = NULL;
+    n->value.num = num;
+    return n;
+}
+jsonh_t* jsonh_new_string(jchar_t* str){
+    jsonh_t* s = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!s) return NULL;
+    s->type = JSONH_STRING;
+    s->next = s->prev = NULL;
+    s->value.str = (jchar_t*)calloc(strlen(str),sizeof(jchar_t));
+    if(!s->value.str){
+        free(s);
+        return NULL;
+    }
+    strcpy(s->value.str,str);
+    return s;
+}
+jsonh_t* jsonh_new_true(void){
+    jsonh_t* t = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!t) return NULL;
+    t->type = JSONH_TRUE;
+    t->next = t->prev = NULL;
+    t->value.bol = true;
+    return t;
+}
+jsonh_t* jsonh_new_false(void){
+    jsonh_t* f = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!f) return NULL;
+    f->type = JSONH_FALSE;
+    f->next = f->prev = NULL;
+    f->value.bol = false;
+    return f;
+}
+jsonh_t* jsonh_new_bool(bool bol){
+    jsonh_t* b = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!b) return NULL;
+    b->type = bol ? JSONH_TRUE : JSONH_FALSE;
+    b->next = b->prev = NULL;
+    b->value.bol = bol;
+    return b;
+}
+jsonh_t* jsonh_new_null(void){
+    jsonh_t* n = (jsonh_t*)calloc(1,sizeof(jsonh_t));
+    if(!n) return NULL;
+    n->type = JSONH_NULL;
+    n->next = n->prev = n->value.child = NULL;
+    return n;
 }
 
 int jsonh_print(jsonh_t* root){
