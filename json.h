@@ -745,6 +745,8 @@ static int _jh_print_value(FILE* stream, jsonh_t* node, int depth){
             return fjprintf(stream,J("false"));
         case JSONH_NULL:
             return fjprintf(stream,J("null"));
+        default:
+            return -1;
     }
 }
 
@@ -917,7 +919,7 @@ size_t   jsonh_arr_size(jsonh_t* arr){
     return s;
 }
 jsonh_t* jsonh_arr_get(jsonh_t* arr, size_t index){
-    if(!arr || index < 0) return NULL;
+    if(!arr) return NULL;
     if(arr->type != JSONH_ARRAY) return NULL;
     jsonh_t* cur = arr->value.child;
     for(size_t i = 0; i < index; i++){
@@ -947,6 +949,7 @@ int     jsonh_arr_pop(jsonh_t* arr){
     while(cur->next) cur = cur->next;
     cur->prev->next = NULL;
     jsonh_delete(cur);
+    return 0;
 }
 int     jsonh_arr_put(jsonh_t* arr, jsonh_t* item){
     if(!arr | !item) return -1;
@@ -963,9 +966,10 @@ int     jsonh_arr_pull(jsonh_t* arr){
     jsonh_t* cur = arr->value.child;
     arr->value.child = cur->next;
     jsonh_delete(cur);
+    return 0;
 }
 int     jsonh_arr_insert(jsonh_t* arr, size_t index, jsonh_t* item){
-    if(!arr | !item || index < 0 ) return -1;
+    if(!arr | !item) return -1;
     if(arr->type != JSONH_ARRAY) return -1;
 
     jsonh_t* cur = arr->value.child;
@@ -986,7 +990,7 @@ int     jsonh_arr_insert(jsonh_t* arr, size_t index, jsonh_t* item){
     return 0;
 }
 int     jsonh_arr_remove(jsonh_t* arr, size_t index){
-    if(!arr || index < 0 ) return -1;
+    if(!arr) return -1;
     if(arr->type != JSONH_ARRAY) return -1;
 
     jsonh_t* cur = arr->value.child;
