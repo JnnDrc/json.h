@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <cjson/cJSON.h>
-
-#define JH_PREFIX
+#define JSONH_PREFIX
 #define JSONH_IMPL
-#include "json.h"
+#define JSONH_WIDE
+#include "../json.h"
 
 noreturn void panic(char* msg){
     fprintf(stderr,"%s\n",msg);
@@ -23,12 +22,12 @@ int main(void){
     
     // jsonh_write(stdout,json);
 
-    jsonh_t* strings = jsonh_obj_get(json,"strings");
-    jsonh_t* string  = jsonh_obj_get(strings,"simple");
+    jsonh_t* strings = jsonh_obj_get(json,L"strings");
+    jsonh_t* string  = jsonh_obj_get(strings,L"simple");
 
     jsonh_write(stdout,string);
 
-    jsonh_t* array = jsonh_obj_get(json,"arrays");
+    jsonh_t* array = jsonh_obj_get(json,L"arrays");
     if(!array) panic("array does not exist");
     size_t len = jsonh_arr_size(array);
     printf("\narray has %zu elements\n",len);
@@ -37,26 +36,26 @@ int main(void){
 
     jsonh_write(stdout,arr3);
 
-    FILE* out = fopen("out.json","wb");
+    FILE* out = fopen("wout.json","wb");
     if(!out) return -1;
 
-    jsonh_t* obj = jsonh_obj_get(json,"object");
+    jsonh_t* obj = jsonh_obj_get(json,L"object");
     if(!obj) panic("no object");
     jsonh_write(stdout,obj);
-    jsonh_t* Obj = jsonh_obj_iget(json,"ObJeCT");
+    jsonh_t* Obj = jsonh_obj_iget(json,L"ObJeCT");
     if(!Obj) panic("No ObJeCT");
     jsonh_write(stdout,Obj);
 
 
-    jsonh_obj_add(obj,"anull",jsonh_new_null());
-    jsonh_obj_del(obj,"nested");
+    jsonh_obj_add(obj,L"anull",jsonh_new_null());
+    jsonh_obj_del(obj,L"nested");
     
     jsonh_write(out,obj);
 
-    FILE* out2 = fopen("out2.json","wb");
+    FILE* out2 = fopen("wout2.json","wb");
     if(!out2) return -1;
 
-    jsonh_t* floats = jh_obj_get(json,"floats");
+    jsonh_t* floats = jh_obj_get(json,L"floats");
     jh_arr_pop(floats);
     jh_arr_push(floats,jh_new_number(6.7f));
     

@@ -1,4 +1,4 @@
 /.clangd
 /*.exe
-/out*
+/*out*
 /tags

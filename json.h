@@ -18,13 +18,56 @@
 #include <stdbool.h>
 #endif /* < C23 */
 
-// currently, jsonh supports only ASCII, instead of Unicode (ecma-404)
+// currently, jsonh supports only ASCII and WIDE mode (unlike UNICODE of ecma-404, blame C standard for this)
 #ifdef JSONH_WIDE
+// Because of wide char being the best c can do, wide is is very shit to use,
+// you will need to convert output files (may be utf-16le) to utf-8
+// i highly recommend to use ASCII mode
+
 #include <wchar.h>
+#include <wctype.h>
 typedef wchar_t jchar_t;
-#error "WIDE CHARS NOT SUPPORTED YET"
+#define jcslen(s)        wcslen(s)
+#define jcscmp(s1,s2)    wcscmp(s1,s2)
+#define jcsncmp(s1,s2,n) wcsncmp(s1,s2,n)
+#define jcscpy(s1,s2)    wcscpy(s1,s2)
+#define jcsdup(s)        wcsdup(s)
+#define jcstol(n,e,b)    wcstol(n,e,b)
+
+#define tojlower(c)      towlower((wint_t)(c))
+
+#define fgetjs(d,s,f)   fgetws(d,s,f)
+#define fgetjc(f)       fgetwc(f)
+
+#define fjprintf fwprintf
+
+#define JEOF WEOF
+
+#define J(s) L##s
+#define JFMT "%ls"
+
 #else
+
 typedef char jchar_t;
+#define jcslen(s)        strlen(s)
+#define jcscmp(s1,s2)    strcmp(s1,s2)
+#define jcsncmp(s1,s2,n) strncmp(s1,s2,n)
+#define jcscpy(s1,s2)    strcpy(s1,s2)
+#define jcsdup(s)        strdup(s)
+#define jcstol(n,e,b)    strtol(n,e,b)
+
+#define tojlower(c)      towlower((unsigned char)(c))
+
+#define fgetjs(d,s,f)   fgets(d,s,f)
+#define fgetjc(f)       fgetc(f)
+
+#define fjprintf fprintf
+
+#define JEOF EOF
+
+#define J(s) s
+#define JFMT "%s"
+
 #endif /* JSONH_WIDE */
 
 typedef enum jsonh_type{
@@ -237,19 +280,13 @@ void     jsonh_delete(jsonh_t* root);
 #define _JCHR_SOLI 0x002F // solidus, /
 
 // definiton of ecma-404 literal name values
-// #define _JLIT_TRUE  "true"
-// #define _JLIT_FALSE "false"
-// #define _JLIT_NULL  "null"
 static const jchar_t _JLIT_TRUE[]  = {0x0074,0x0072,0x0075,0x0065};
 static const jchar_t _JLIT_FALSE[] = {0x0066,0x0061,0x006C,0x0073,0x0065};
 static const jchar_t _JLIT_NULL[]  = {0x006E,0x0075,0x006C,0x006C};
 
-// #define _JLEN_TRUE   sizeof(_JLIT_TRUE)  - 1
-// #define _JLEN_FALSE  sizeof(_JLIT_FALSE) - 1
-// #define _JLEN_NULL   sizeof(_JLIT_NULL)  - 1
-#define _JLEN_TRUE   sizeof(_JLIT_TRUE)
-#define _JLEN_FALSE  sizeof(_JLIT_FALSE)
-#define _JLEN_NULL   sizeof(_JLIT_NULL)
+#define _JLEN_TRUE   (sizeof(_JLIT_TRUE)  / sizeof(jchar_t))
+#define _JLEN_FALSE  (sizeof(_JLIT_FALSE) / sizeof(jchar_t))
+#define _JLEN_NULL   (sizeof(_JLIT_NULL)  / sizeof(jchar_t))
 
 // parser state
 
@@ -312,10 +349,12 @@ static jchar_t _jhY_next(struct _jhY* p){
         p->column = 1;
     }else p->column++;
     p->pos++;
+    if(p->pos >= p->size) return p->cur = 0;
     return p->cur = p->src[p->pos];
 }
 
 static jchar_t _jhY_peek(struct _jhY* p){
+    if(p->pos + 1 >= p->size) return 0;
     return p->src[p->pos+1];
 }
 
@@ -357,7 +396,7 @@ static jchar_t* _jhY_parse_cstr(struct _jhY* p){
         // empty string
         jchar_t* s = (jchar_t*)calloc(1,sizeof(jchar_t));
         if(!s) return NULL;
-        s[0] = '\0';
+        s[0] = 0;
         return s;
     }
 
@@ -387,13 +426,13 @@ static jchar_t* _jhY_parse_cstr(struct _jhY* p){
     jchar_t* buf = (jchar_t*)calloc(cap,sizeof(jchar_t));
     if(!buf) return NULL;
 
-    memcpy(buf,&p->src[start],plen);
+    memcpy(buf,&p->src[start],plen*sizeof(jchar_t));
     
     while(1){
         if(p->pos >= p->size || p->cur == '\0') _jhY_panic("Unterminated string");
         if(_jhY_check(p,_JCHR_QUOT)) break;
         
-        jchar_t c = p->src[p->pos];
+        jchar_t c = p->cur;
 
         if(c == _JCHR_RSOL){
             switch((c = _jhY_next(p))){
@@ -408,11 +447,10 @@ static jchar_t* _jhY_parse_cstr(struct _jhY* p){
                 case 'u':
                     {
                         jchar_t hexbuf[5];
-                        memcpy(hexbuf,&p->src[p->pos],4*sizeof(jchar_t));
-                        hexbuf[4] = '\0';
-                        jchar_t hex = strtol(hexbuf,NULL,16);
+                        for(int i = 0; i < 4; i++) hexbuf[i] = _jhY_next(p);
+                        hexbuf[4] = 0;
+                        jchar_t hex = jcstol(hexbuf,NULL,16);
                         c = hex;
-                        p->pos += 3;
                     }
                     break;
                 default:
@@ -421,14 +459,14 @@ static jchar_t* _jhY_parse_cstr(struct _jhY* p){
         }
         if(len + 1 >= cap){
             cap *= 2;
-            buf = (jchar_t*)realloc(buf,cap);
+            buf = (jchar_t*)realloc(buf,cap*sizeof(jchar_t));
         }
         buf[len++] = c;
 
         _jhY_next(p);
     }
 
-    buf[len] = '\0';
+    buf[len] = 0;
     return buf;
 }
 
@@ -527,7 +565,7 @@ static jsonh_t* _jhY_parse_string(struct _jhY* p){
     return str;
 }
 static jsonh_t* _jhY_parse_true(struct _jhY* p){
-    if(strncmp(&p->src[p->pos],_JLIT_TRUE,_JLEN_TRUE)) return NULL;
+    if(jcsncmp(&p->src[p->pos],_JLIT_TRUE,_JLEN_TRUE)) return NULL;
     p->pos += _JLEN_TRUE;
     p->cur = p->src[p->pos];
     jsonh_t* t = (jsonh_t*)malloc(sizeof(jsonh_t));
@@ -541,7 +579,7 @@ static jsonh_t* _jhY_parse_true(struct _jhY* p){
     return t;
 }
 static jsonh_t* _jhY_parse_false(struct _jhY* p){
-    if(strncmp(&p->src[p->pos],_JLIT_FALSE,_JLEN_FALSE)) return NULL;
+    if(jcsncmp(&p->src[p->pos],_JLIT_FALSE,_JLEN_FALSE)) return NULL;
     p->pos += _JLEN_FALSE;
     p->cur = p->src[p->pos];
 
@@ -556,7 +594,7 @@ static jsonh_t* _jhY_parse_false(struct _jhY* p){
     return f;
 }
 static jsonh_t* _jhY_parse_null(struct _jhY* p){
-    if(strncmp(&p->src[p->pos],_JLIT_NULL,_JLEN_NULL)) return NULL;
+    if(jcsncmp(&p->src[p->pos],_JLIT_NULL,_JLEN_NULL)) return NULL;
     p->pos += _JLEN_NULL;
     p->cur = p->src[p->pos];
     jsonh_t* f = (jsonh_t*)malloc(sizeof(jsonh_t));
@@ -657,38 +695,38 @@ static void _jhY_llappend(jsonh_t** head, jsonh_t** tail, jsonh_t* node){
 static int _jh_indent(FILE* stream, int depth)
 {
     int r = 0;
-    for(int i = 0; i < depth; i++) r += fprintf(stream,"  ");
+    for(int i = 0; i < depth; i++) r += fjprintf(stream,J("  "));
     return r;
 }
 static int _jh_print_object(FILE* stream, jsonh_t* node, int depth){
-    if(node->value.child == NULL) return fprintf(stream,"{}");
+    if(node->value.child == NULL) return fjprintf(stream,J("{}"));
     int r = 0;
-    r += fprintf(stream,"{\n");
+    r += fjprintf(stream,J("{\n"));
     for(jsonh_t* cur = node->value.child; cur; cur = cur->next){
         r += _jh_indent(stream,depth+1);
-        r += fprintf(stream,"\"%s\": ",cur->name);
+        r += fjprintf(stream,J("\"" JFMT "\": "),cur->name);
         r += _jh_print_value(stream,cur,depth+1);
         
-        if(cur->next) r += fprintf(stream,",");
-        r += fprintf(stream,"\n");
+        if(cur->next) r += fjprintf(stream,J(","));
+        r += fjprintf(stream,J("\n"));
     }
     r += _jh_indent(stream,depth);
-    r += fprintf(stream,"}");
+    r += fjprintf(stream,J("}"));
     return r;
 }
 static int _jh_print_array(FILE* stream, jsonh_t* node, int depth){
-    if(node->value.child == NULL) return fprintf(stream,"[]");
+    if(node->value.child == NULL) return fjprintf(stream,J("[]"));
     int r = 0;
-    r += fprintf(stream,"[\n");
+    r += fjprintf(stream,J("[\n"));
     for(jsonh_t* cur = node->value.child; cur; cur = cur->next){
         r += _jh_indent(stream,depth+1);
         r += _jh_print_value(stream,cur,depth+1);
         
-        if(cur->next) r += fprintf(stream,",");
-        r += fprintf(stream,"\n");
+        if(cur->next) r += fjprintf(stream,J(","));
+        r += fjprintf(stream,J("\n"));
     }
     r += _jh_indent(stream,depth);
-    r += fprintf(stream,"]");
+    r += fjprintf(stream,J("]"));
     return r;
 }
 static int _jh_print_value(FILE* stream, jsonh_t* node, int depth){
@@ -698,15 +736,15 @@ static int _jh_print_value(FILE* stream, jsonh_t* node, int depth){
         case JSONH_ARRAY:
             return _jh_print_array(stream,node,depth);
         case JSONH_NUMBER:
-            return fprintf(stream,"\"%g\"",node->value.num);
+            return fjprintf(stream,J("\"%g\""),node->value.num);
         case JSONH_STRING:
-            return fprintf(stream,"\"%s\"",node->value.str);
+            return fjprintf(stream,J("\"" JFMT "\""),node->value.str);
         case JSONH_TRUE:
-            return fprintf(stream,"true");
+            return fjprintf(stream,J("true"));
         case JSONH_FALSE:
-            return fprintf(stream,"false");
+            return fjprintf(stream,J("false"));
         case JSONH_NULL:
-            return fprintf(stream,"null");
+            return fjprintf(stream,J("null"));
     }
 }
 
@@ -724,6 +762,10 @@ jsonh_t* jsonh_parse(jchar_t* src, size_t len){
 
 jsonh_t* jsonh_read(FILE* file){
     if(!file) return NULL;
+
+#ifdef JSONH_WIDE
+    fwide(file,1);
+#endif
     
     fseek(file,0L,SEEK_END);
     long sz = ftell(file);
@@ -733,10 +775,15 @@ jsonh_t* jsonh_read(FILE* file){
 
     jchar_t* buf = (jchar_t*)calloc(fsiz,sizeof(jchar_t));
     if(!buf) return NULL;
+    
+    jchar_t jc;
+    size_t  len = 0;
+    while((jc = fgetjc(file)) != JEOF){
+        buf[len++] = jc;
+    }
+    buf[len] = 0;
 
-    fread(buf,sizeof(jchar_t),fsiz,file);
-
-    jsonh_t* json = jsonh_parse(buf,strlen(buf));
+    jsonh_t* json = jsonh_parse(buf,jcslen(buf));
     free(buf);
     return json;
 }
@@ -762,16 +809,16 @@ void jsonh_delete(jsonh_t* root){
     free(root);
 }
 
-int strcmpi(const char* s1, const char* s2){
-    while(*s1 && (tolower((unsigned char)*s1) == tolower((unsigned char)*s2))) (s1++,s2++);
-    return tolower((unsigned char)*s1) - tolower((unsigned char)*s2);
+int jcscmpi(const jchar_t* s1, const jchar_t* s2){
+    while(*s1 && (tojlower(*s1) == tojlower(*s2))) (s1++,s2++);
+    return tojlower(*s1) - tojlower(*s2);
 }
 
 bool jsonh_obj_has(jsonh_t* obj, jchar_t* key){
     if(!obj || !key) return false;
     if(obj->type != JSONH_OBJECT) return false;
     for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
-        if(!strcmp(cur->name,key)) return true;
+        if(!jcscmp(cur->name,key)) return true;
     }
     return false;
 }
@@ -780,7 +827,7 @@ jsonh_t* jsonh_obj_get(jsonh_t* obj, jchar_t* key){
     if(!obj || !key) return NULL;
     if(obj->type != JSONH_OBJECT) return NULL;
     for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
-        if(!strcmp(cur->name,key)) return cur;
+        if(!jcscmp(cur->name,key)) return cur;
     }
     return NULL;
 }
@@ -789,7 +836,7 @@ bool     jsonh_obj_ihas(jsonh_t* obj, jchar_t* key){
     if(!obj || !key) return false;
     if(obj->type != JSONH_OBJECT) return false;
     for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
-        if(!strcmpi(cur->name,key)) return true;
+        if(!jcscmpi(cur->name,key)) return true;
     }
     return false;
 }
@@ -797,7 +844,7 @@ jsonh_t* jsonh_obj_iget(jsonh_t* obj, jchar_t* key){
     if(!obj || !key) return NULL;
     if(obj->type != JSONH_OBJECT) return NULL;
     for (jsonh_t* cur = obj->value.child; cur; cur = cur->next) {
-        if(!strcmpi(cur->name,key)) return cur;
+        if(!jcscmpi(cur->name,key)) return cur;
     }
     return NULL;
 }
@@ -809,14 +856,14 @@ int jsonh_obj_add(jsonh_t* obj,jchar_t* key, jsonh_t* item){
     jsonh_t* cur = obj->value.child;
     if(!cur){
         obj->value.child = item;
-        item->name = strdup(key);
+        item->name = jcsdup(key);
         return 0;
     }
     while(cur->next) cur = cur->next;
 
     cur->next  = item;
     item->prev = cur;
-    item->name = strdup(key);
+    item->name = jcsdup(key);
 
     return 0;
 
@@ -827,7 +874,7 @@ int jsonh_obj_del(jsonh_t* obj, jchar_t* key){
     if(obj->type != JSONH_OBJECT) return -1;
     
     for(jsonh_t* cur = obj->value.child; cur; cur = cur->next){
-        if(!strcmp(cur->name,key)){
+        if(!jcscmp(cur->name,key)){
             jsonh_t* prev = cur->prev;
             jsonh_t* next = cur->next;
 
@@ -847,7 +894,7 @@ int jsonh_obj_idel(jsonh_t* obj, jchar_t* key){
     if(obj->type != JSONH_OBJECT) return -1;
     
     for(jsonh_t* cur = obj->value.child; cur; cur = cur->next){
-        if(!strcmpi(cur->name,key)){
+        if(!jcscmpi(cur->name,key)){
             jsonh_t* prev = cur->prev;
             jsonh_t* next = cur->next;
 
@@ -978,10 +1025,10 @@ jchar_t* jsonh_str_get(jsonh_t* str){
 jchar_t* jsonh_str_dup(jsonh_t* str){
     if(!str) return NULL;
     if(str->type != JSONH_STRING) return NULL;
-    size_t len = strlen(str->value.str);
+    size_t len = jcslen(str->value.str);
     jchar_t* dup = (jchar_t*)calloc(len,sizeof(jchar_t));
     if(!dup) return NULL;
-    strcpy(dup,str->value.str);
+    jcscpy(dup,str->value.str);
     return dup;
 }
 
@@ -990,7 +1037,7 @@ int jsonh_str_set(jsonh_t* str, jchar_t* val){
     if(str->type != JSONH_STRING) return -1;
 
     free(str->value.str);
-    str->value.str = strdup(val);
+    str->value.str = jcsdup(val);
 
     return 0;
 }
@@ -1073,12 +1120,12 @@ jsonh_t* jsonh_new_string(jchar_t* str){
     if(!s) return NULL;
     s->type = JSONH_STRING;
     s->next = s->prev = NULL;
-    s->value.str = (jchar_t*)calloc(strlen(str),sizeof(jchar_t));
+    s->value.str = (jchar_t*)calloc(jcslen(str),sizeof(jchar_t));
     if(!s->value.str){
         free(s);
         return NULL;
     }
-    strcpy(s->value.str,str);
+    jcscpy(s->value.str,str);
     return s;
 }
 jsonh_t* jsonh_new_true(void){

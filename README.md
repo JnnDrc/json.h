@@ -1,6 +1,6 @@
 # JSON.h
 
-single header json parser/library
+A (almost) full ecma-404 single header json parser/library
 
 ## Usage
 
